@@ -19,6 +19,8 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class ChatGptService {
 
+
+
     public String chatGPTResult(String model, String content, Double temperature, Integer maxTokens) throws IOException {
         if(null == model){
             model = "gpt-3.5-turbo";
@@ -34,7 +36,7 @@ public class ChatGptService {
         if(null == maxTokens){
             maxTokens = 4000;
         }
-
+        String token = "xxxx";
         Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 9910));
         OkHttpClient client = new OkHttpClient().newBuilder().proxy(proxy).readTimeout(10*60, TimeUnit.SECONDS).build();
         MediaType mediaType = MediaType.parse("application/json");
@@ -53,7 +55,7 @@ public class ChatGptService {
                 .url("https://api.openai.com/v1/chat/completions")
                 .post(body)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("Authorization", "Bearer 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")
+                .addHeader("Authorization", "Bearer " + token)
                 .build();
 
         Response response = client.newCall(request).execute();
