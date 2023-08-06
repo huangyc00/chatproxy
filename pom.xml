@@ -32,7 +32,11 @@
             <artifactId>fastjson</artifactId>
             <version>1.2.72</version>
         </dependency>
-
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <version>4.1.42.Final</version>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -50,7 +54,28 @@
             <version>0.10.0</version>
         </dependency>
 
+        <!-- https://mvnrepository.com/artifact/javax.sip/jain-sip-api -->
+        <!-- https://mvnrepository.com/artifact/javax.sip/jain-sip-api -->
+        <dependency>
+            <groupId>javax.sip</groupId>
+            <artifactId>jain-sip-api</artifactId>
+            <version>1.2</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>log4j-over-slf4j</artifactId>
+            <version>1.7.26</version>
+        </dependency>
+
+        <dependency>
+            <groupId>javax.sip</groupId>
+            <artifactId>jain-sip-ri</artifactId>
+            <version>1.2</version>
+        </dependency>
     </dependencies>
+
 
     <build>
         <plugins>
