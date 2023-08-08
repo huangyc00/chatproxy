@@ -19,7 +19,7 @@ public class HeartbeatServerHandler extends ChannelInboundHandlerAdapter {
         if (evt instanceof IdleStateEvent) {
             IdleStateEvent e = (IdleStateEvent) evt;
             Channel channel = ctx.channel();
-            if (e.state() == IdleState.READER_IDLE) {
+            if (e.state() == IdleState.ALL_IDLE) {
                 log.info("can not receive from client,channel:{},count:{}", channel,count);
                 if(count.get() > 3){
                     log.warn("channel:{} close because of more than count：{}", channel,count);

@@ -1,6 +1,6 @@
 package com.hyc.chatproxy.tcp.server;
 
-import com.hyc.chatproxy.tcp.server.handler.EchoHandler;
+import com.hyc.chatproxy.tcp.server.handler.BusinessHandler;
 import com.hyc.chatproxy.tcp.server.handler.ExceptionCatchHandler;
 import com.hyc.chatproxy.tcp.server.handler.HeartbeatServerHandler;
 import io.netty.bootstrap.ServerBootstrap;
@@ -18,13 +18,12 @@ import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import lombok.extern.slf4j.Slf4j;
-import sun.rmi.runtime.RuntimeUtil;
+import org.springframework.context.ConfigurableApplicationContext;
 
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class ChatServer {
-
 
     public void startserver(int port) {
         EventLoopGroup bossEventLoopGroup = new NioEventLoopGroup();
@@ -51,9 +50,9 @@ public class ChatServer {
                             pipeline.addLast(new StringDecoder(CharsetUtil.UTF_8));
                             pipeline.addLast(new StringEncoder(CharsetUtil.UTF_8));
                             pipeline.addLast(new LineEncoder());
-                            pipeline.addLast(new IdleStateHandler(5, 0, 0, TimeUnit.SECONDS)); // 添加IdleStateHandler，设置读空闲时间为5
+                            pipeline.addLast(new IdleStateHandler(0, 0, 5, TimeUnit.SECONDS)); // 添加IdleStateHandler，设置读空闲时间为5
                             pipeline.addLast(new HeartbeatServerHandler()); // 添加IdleStateHandler，设置读空闲时间为5
-                            pipeline.addLast(serviceHandlerGroup,new EchoHandler());
+                            pipeline.addLast(serviceHandlerGroup,new BusinessHandler());
                             pipeline.addLast(new ExceptionCatchHandler());
                         }
                     });

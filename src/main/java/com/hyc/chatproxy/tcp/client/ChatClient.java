@@ -8,6 +8,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LineBasedFrameDecoder;
+import io.netty.handler.codec.string.LineEncoder;
 import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
 import io.netty.handler.logging.LogLevel;
@@ -37,78 +38,60 @@ public class ChatClient {
     public static void main(String[] args) {
         try {
             new ChatClient("127.0.0.1", 19999).run();
-        }catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     public void run() {
-        ChannelFuture connectFuture = doConnect();
-        if(connectFuture == null){
-//            Thread.sleep(5000L);
-//            log.info("reconnect");
-//            this.run();
-//            return;
-        }
-        Channel channel = connectFuture.channel();
-        connectFuture.addListener(result -> {
-            boolean success = result.isSuccess();
-            if (success) {
-                //开始心跳机检测
-//                startSendHeartBeat(channel);
-            } else {
-                Throwable cause = connectFuture.cause();
-                //重新进行连接
-//                log.info("channel:{} connect fail eventLoopgroup shutdown , run again,error：",channel.id(),cause);
-//                //先关闭事件循环组，然后在进行重连
-//                Thread.sleep(5000L);
-//                this.run();
-            }
-        });
-
-        //监听关闭时间，如果关闭了，则直接进行重连
-        ChannelFuture closeFuture = null;
         try {
-            closeFuture = channel.close().sync();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        closeFuture.addListener(result -> {
-//            //重新进行连接
-//            log.info("channel:{} close eventLoopgroup shutdown , run again",channel.id(), connectFuture.cause());
-//            Thread.sleep(5000L);
-//            this.run();
-        });
-    }
+            ChannelFuture channelFuture = doConnect();
+            channelFuture.addListener(listener -> {
+                boolean success = listener.isSuccess();
+                if(success){
+                    startSendHeartBeat(channelFuture.channel());
+                    startScanf(channelFuture.channel());
+                }
+            });
 
-    public ChannelFuture doConnect() {
-        EventLoopGroup group = new NioEventLoopGroup();
-        Bootstrap bootstrap = new Bootstrap();
-        try {
-            bootstrap.group(group)
-                    .channel(NioSocketChannel.class) // 使用NIO SocketChannel
-                    .handler(new ChannelInitializer<SocketChannel>() {
-                        @Override
-                        protected void initChannel(SocketChannel ch) {
-                            ChannelPipeline pipeline = ch.pipeline();
-                            pipeline.addLast(new LoggingHandler(LogLevel.DEBUG)); // 添加LoggingHandler
-                            pipeline.addLast(new LineBasedFrameDecoder(1024)); // 使用LineBasedFrameDecoder
-                            pipeline.addLast(new StringDecoder(CharsetUtil.UTF_8));
-                            pipeline.addLast(new StringEncoder(CharsetUtil.UTF_8));
-                            // 添加IdleStateHandler，设置写空闲时间为指定的心跳间隔时间
-//                            pipeline.addLast(new IdleStateHandler(0, 10, 0, TimeUnit.SECONDS));
-//                            pipeline.addLast(new HeartbeatClientHandler()); // 添加自定义的ChannelHandler
-                            pipeline.addLast(new TcpClientHandler()); // 添加自定义的ChannelHandler
-                        }
-                    });
-            ChannelFuture connectFuture = bootstrap.connect(this.getHost(), this.getPort()).sync();
-            return connectFuture;
+            ChannelFuture closeFuture = channelFuture.channel().closeFuture();
+            closeFuture.addListener(result -> {
+                log.error("channel close,reconnect");
+                run();
+            });
         } catch (Exception e) {
             e.printStackTrace();
-            return null;
-        }finally {
-            group.shutdownGracefully();
         }
+
+
+    }
+
+
+    public ChannelFuture doConnect() throws Exception {
+
+        EventLoopGroup group = new NioEventLoopGroup();
+        Bootstrap bootstrap = new Bootstrap();
+
+        bootstrap.group(group)
+                .channel(NioSocketChannel.class) // 使用NIO SocketChannel
+                .handler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel ch) {
+                        ChannelPipeline pipeline = ch.pipeline();
+                        pipeline.addLast(new LoggingHandler(LogLevel.INFO)); // 添加LoggingHandler
+                        pipeline.addLast(new LineBasedFrameDecoder(1024)); // 使用LineBasedFrameDecoder
+                        pipeline.addLast(new StringDecoder(CharsetUtil.UTF_8));
+                        pipeline.addLast(new StringEncoder(CharsetUtil.UTF_8));
+                        pipeline.addLast(new LineEncoder());
+//                             添加IdleStateHandler，设置写空闲时间为指定的心跳间隔时间
+                        pipeline.addLast(new IdleStateHandler(0, 3, 0, TimeUnit.SECONDS));
+                        pipeline.addLast(new HeartbeatClientHandler()); // 添加自定义的ChannelHandler
+                        pipeline.addLast(new TcpClientHandler()); // 添加自定义的ChannelHandler
+                    }
+                });
+        ChannelFuture connectFuture = bootstrap.connect(this.getHost(), this.getPort());
+
+        return connectFuture;
 
     }
 
@@ -116,8 +99,9 @@ public class ChatClient {
         // 启动心跳定时任务
         channel.eventLoop().parent().scheduleAtFixedRate(() -> {
             if (channel.isActive()) {
-                System.out.println("Sending heartbeat...");
-                channel.writeAndFlush("Heartbeat");
+                log.info("Sending heartbeat...");
+                String ping = "ping";
+                channel.pipeline().writeAndFlush(ping);
             }
         }, 0, 2, TimeUnit.SECONDS);
     }

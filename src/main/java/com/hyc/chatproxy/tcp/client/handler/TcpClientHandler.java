@@ -16,4 +16,9 @@ public class TcpClientHandler  extends SimpleChannelInboundHandler<String> {
         cause.printStackTrace();
     }
 
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        log.info("channel:{} is inactive",ctx.channel());
+        super.channelInactive(ctx);
+    }
 }
