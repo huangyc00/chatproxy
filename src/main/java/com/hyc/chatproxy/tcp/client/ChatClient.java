@@ -1,22 +1,28 @@
 package com.hyc.chatproxy.tcp.client;
 
+import com.google.protobuf.Any;
+import com.google.protobuf.StringValue;
+import com.hyc.chatproxy.ChatproxyApplication;
+import com.hyc.chatproxy.sip.MySipServer;
 import com.hyc.chatproxy.tcp.client.handler.HeartbeatClientHandler;
 import com.hyc.chatproxy.tcp.client.handler.TcpClientHandler;
+import com.hyc.chatproxy.tcp.proto.ChatMessageProto;
+import com.hyc.chatproxy.tcp.proto.CmdType;
+import com.hyc.chatproxy.tcp.server.ChatServer;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.LineBasedFrameDecoder;
-import io.netty.handler.codec.string.LineEncoder;
-import io.netty.handler.codec.string.StringDecoder;
-import io.netty.handler.codec.string.StringEncoder;
+import io.netty.handler.codec.protobuf.ProtobufDecoder;
+import io.netty.handler.codec.protobuf.ProtobufEncoder;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.timeout.IdleStateHandler;
-import io.netty.util.CharsetUtil;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.SpringApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 
 import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
@@ -26,7 +32,7 @@ import java.util.concurrent.TimeUnit;
 public class ChatClient {
 
     public final static int RECONNECT_INTERVAL_SECONDS = 3;
-
+    public  static Channel channel;
     private String host;
     private int port;
 
@@ -35,13 +41,13 @@ public class ChatClient {
         this.port = port;
     }
 
-    public static void main(String[] args) {
-        try {
-            new ChatClient("127.0.0.1", 19999).run();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public static void main(String[] args) throws Exception {
+        ConfigurableApplicationContext applicationContext = SpringApplication.run(ChatproxyApplication.class, args);
+        ChatproxyApplication.applicationContext = applicationContext;
+        new ChatClient("127.0.0.1", 19999).run();
     }
+
+
 
     public void run() {
         try {
@@ -49,8 +55,8 @@ public class ChatClient {
             channelFuture.addListener(listener -> {
                 boolean success = listener.isSuccess();
                 if(success){
-                    startSendHeartBeat(channelFuture.channel());
                     startScanf(channelFuture.channel());
+                    startSendHeartBeat(channelFuture.channel());
                 }
             });
 
@@ -59,6 +65,7 @@ public class ChatClient {
                 log.error("channel close,reconnect");
                 run();
             });
+            ChatClient.channel = channelFuture.channel();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -78,12 +85,10 @@ public class ChatClient {
                     @Override
                     protected void initChannel(SocketChannel ch) {
                         ChannelPipeline pipeline = ch.pipeline();
-                        pipeline.addLast(new LoggingHandler(LogLevel.INFO)); // 添加LoggingHandler
-                        pipeline.addLast(new LineBasedFrameDecoder(1024)); // 使用LineBasedFrameDecoder
-                        pipeline.addLast(new StringDecoder(CharsetUtil.UTF_8));
-                        pipeline.addLast(new StringEncoder(CharsetUtil.UTF_8));
-                        pipeline.addLast(new LineEncoder());
-//                             添加IdleStateHandler，设置写空闲时间为指定的心跳间隔时间
+                        pipeline.addLast(new LoggingHandler(LogLevel.DEBUG)); // 添加LoggingHandler
+                        pipeline.addLast(new ProtobufEncoder());
+                        pipeline.addLast(new ProtobufDecoder(ChatMessageProto.MessageReq.getDefaultInstance()));
+                        pipeline.addLast(new ProtobufDecoder(ChatMessageProto.MessageResp.getDefaultInstance()));
                         pipeline.addLast(new IdleStateHandler(0, 3, 0, TimeUnit.SECONDS));
                         pipeline.addLast(new HeartbeatClientHandler()); // 添加自定义的ChannelHandler
                         pipeline.addLast(new TcpClientHandler()); // 添加自定义的ChannelHandler
@@ -99,11 +104,11 @@ public class ChatClient {
         // 启动心跳定时任务
         channel.eventLoop().parent().scheduleAtFixedRate(() -> {
             if (channel.isActive()) {
-                log.info("Sending heartbeat...");
-                String ping = "ping";
-                channel.pipeline().writeAndFlush(ping);
+                StringValue ping = StringValue.newBuilder().setValue(CmdType.HEARTBEAT).build();
+                ChatMessageProto.MessageReq pingMessage = ChatMessageProto.MessageReq.newBuilder().setCmd(CmdType.HEARTBEAT).setBody(Any.pack(ping)).build();
+                channel.pipeline().writeAndFlush(pingMessage);
             }
-        }, 0, 2, TimeUnit.SECONDS);
+        }, 0, 30, TimeUnit.SECONDS);
     }
 
 
@@ -112,13 +117,18 @@ public class ChatClient {
             // 从控制台输入消息并发送给服务器
             Scanner scanner = new Scanner(System.in);
             while (channel.isActive()) {
-                System.out.print("Enter message (type 'exit' to quit): ");
                 String message = scanner.nextLine();
                 if ("exit".equalsIgnoreCase(message)) {
                     break;
                 }
-                // 请求服务器
-                channel.writeAndFlush(message);
+                if(message.equals(CmdType.BODYSIZE)){
+                    StringValue bodysize = StringValue.newBuilder().setValue("nicaiciaciai").build();
+                    ChatMessageProto.MessageReq bodysizeMessage = ChatMessageProto.MessageReq.newBuilder().setCmd(CmdType.BODYSIZE)
+                            .setBody(Any.pack(bodysize)).build();
+                    // 请求服务器
+                    channel.writeAndFlush(bodysizeMessage);
+                }
+
             }
         });
     }

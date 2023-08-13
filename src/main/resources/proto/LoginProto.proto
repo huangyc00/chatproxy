@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+import "google/protobuf/any.proto";
+
+package com.hyc.chatproxy.tcp.proto;
+
+
+// 生成类的包名
+option java_package = "com.hyc.chatproxy.tcp.proto";
+
+message LoginReq {
+    string username = 1;
+    string password = 2;
+}
+
+message LoginResp {
+    int64 id = 1;
+    string token = 2;
+}

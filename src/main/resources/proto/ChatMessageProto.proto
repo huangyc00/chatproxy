@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+import "google/protobuf/any.proto";
+
+package com.hyc.chatproxy.tcp.proto;
+
+
+// 生成类的包名
+option java_package = "com.hyc.chatproxy.tcp.proto";
+
+//请求消息
+message MessageReq {
+    //请求命令
+    string cmd = 1;
+    //请求体
+    google.protobuf.Any body = 2;
+
+}
+
+//返回消息
+message MessageResp {
+    //请求命令
+    string cmd = 1;
+    //返回吗，0表示成功，其他表示失败
+    int32 code = 2;
+    //错误信息
+    string erroMsg = 3;
+    //返回体
+    google.protobuf.Any data = 4;
+}
