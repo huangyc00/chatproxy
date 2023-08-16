@@ -16,12 +16,13 @@ public class EslClientController {
     @GetMapping(value = "/sendSyncApiCommand")
     public EslMessage sendSyncApiCommand(String command, String arg ) throws InterruptedException {
         EslMessage eslMessage = EslClient.inboudClient.sendSyncApiCommand(command,arg);
+
         return eslMessage;
     }
 
 
     @GetMapping(value = "/sendAsyncApiCommand")
-    public String sendAsyncApiCommand(String command, String arg ) throws InterruptedException {
+    public String sendAsyncApiCommand(String command, String arg) throws InterruptedException {
         String eslMessage = EslClient.inboudClient.sendAsyncApiCommand(command,arg);
         return eslMessage;
     }

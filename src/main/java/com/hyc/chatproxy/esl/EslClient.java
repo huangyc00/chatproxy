@@ -3,6 +3,9 @@ package com.hyc.chatproxy.esl;
 
 import com.alibaba.fastjson.JSONObject;
 import com.hyc.chatproxy.ChatproxyApplication;
+import com.hyc.chatproxy.esl.entity.CallChannel;
+import com.hyc.chatproxy.esl.entity.CallDevicesMap;
+import com.hyc.chatproxy.esl.entity.CallSession;
 import com.hyc.chatproxy.tcp.client.ChatClient;
 import lombok.extern.slf4j.Slf4j;
 import org.freeswitch.esl.client.IEslEventListener;
@@ -15,6 +18,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 
 import java.net.InetSocketAddress;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 
@@ -47,7 +51,7 @@ public class EslClient {
         Integer port = 8021;
         String password = "ClueCon";
         Integer timeoutSeconds = 10;
-        Client inboudClient = new EslClient(serverIp,port,password,timeoutSeconds).start();
+        Client inboudClient = new EslClient(serverIp, port, password, timeoutSeconds).start();
         EslClient.inboudClient = inboudClient;
     }
 
@@ -62,15 +66,21 @@ public class EslClient {
                     String eventName = event.getEventName();
                     String headers = JSONObject.toJSONString(event.getEventHeaders());
                     String body = JSONObject.toJSONString(event.getEventBodyLines());
-                    log.info("eventName:{}\r\n headers:{} \r\n body:{}", eventName,headers,body);
+                    log.info("eventName:{}\r\n headers:{} \r\n body:{}", eventName, headers, body);
+                    if (eventName.equals("CHANNEL_CREATE")) {
+                        handleChannelCreate(JSONObject.parseObject(headers,Map.class));
+                    }
                 }
 
                 @Override
+
+
+
                 public void backgroundJobResultReceived(EslEvent event) {
                     String eventName = event.getEventName();
                     String headers = JSONObject.toJSONString(event.getEventHeaders());
                     String body = JSONObject.toJSONString(event.getEventBodyLines());
-                    log.info("eventName:{}\r\n headers:{} \r\n body:{}", eventName,headers,body);
+                    log.info("eventName:{}\r\n headers:{} \r\n body:{}", eventName, headers, body);
                 }
 
             });
@@ -96,4 +106,46 @@ public class EslClient {
     }
 
 
+    public static void handleChannelCreate(Map<String, String> headers) {
+        //判断是否已经存在sessionid,如果没有则创建
+        String sessionid = headers.get("Core-UUID");
+        String called = headers.get("Caller-Destination-Number");
+        String caller = headers.get("Caller-ANI");
+        String direction = headers.get("Call-Direction");
+        String callContext = headers.get("Caller-Context");
+        String callerCreatetime = headers.get("Caller-Channel-Created-Time");
+
+
+        String uniqueUuid = headers.get("Unique-ID");
+        String sipname = headers.get("variable_presence_id");
+
+
+        //设置session的值
+        CallSession callSession = CallDevicesMap.callSessionMap.get(sessionid);
+        if (null == callSession) {
+            callSession = new CallSession();
+            callSession.setSessionid(sessionid);
+            callSession.setCtime(System.currentTimeMillis());
+        }
+        callSession.setCallerCreatetime(callerCreatetime);
+        callSession.setCaller(caller);
+        callSession.setCalled(called);
+        callSession.setDirection(direction);
+        callSession.setCallerContext(callContext);
+
+        //设置channel的值
+        CallChannel callChannel = callSession.getChannelMap().get(uniqueUuid);
+        if (null == callChannel) {
+            callChannel = new CallChannel();
+            callChannel.setUniqueUuid(uniqueUuid);
+            callChannel.setSessionid(sessionid);
+            callChannel.setCreatetime(System.currentTimeMillis());
+        }
+        callChannel.setSipname(sipname);
+        callChannel.setState("CHANNEL_CREATE");
+        callSession.getChannelMap().put(uniqueUuid, callChannel);
+
+        log.info("callsession:{}",callSession);
+
+    }
 }
